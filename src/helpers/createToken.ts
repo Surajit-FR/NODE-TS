@@ -1,4 +1,4 @@
-import { IUser } from '../config/types';
+import { IUser } from '../../types/types';
 import config from './secretkey';
 import JWT from 'jsonwebtoken';
 
@@ -7,9 +7,9 @@ const CreateToken = (user: IUser): string => {
         _id: user._id,
         name: user.name,
         email: user.email,
-        phone: user.phone,
+        subscription: user.subscription,
         password: user.password,
-        is_delete: user.is_delete,
+        is_subscribed: user.is_subscribed,
     }, config.secret_key!, { expiresIn: process.env.SESSION_TIME });
 
     return token;

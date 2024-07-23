@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import UserModel from '../../model/user.model';
-import { ICheckUserBody } from '../../config/types';
+import { ICheckUserBody } from '../../../types/types';
 
 
 // DuplicateUserCheck middleware

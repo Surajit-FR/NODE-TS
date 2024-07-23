@@ -1,4 +1,4 @@
-import { Config } from "../config/types";
+import { Config } from "../../types/types";
 
 const config: Config = {
     secret_key: process.env.SECRET_KEY

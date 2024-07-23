@@ -11,8 +11,8 @@ const router: Router = express.Router();
 /**************************************************** ADMIN AUTH ROUTES ****************************************************/
 
 // Sign-Up
-router.post('/signup', [ModelAuth(ValidateUser), DuplicateUserCheck], RegisterRegular);
+router.post('/signup', [Limiter, ModelAuth(ValidateUser), DuplicateUserCheck], RegisterRegular);
 // Login
-router.post('/login', [HandleRegularLoginError], LoginRegular);
+router.post('/login', [Limiter, HandleRegularLoginError], LoginRegular);
 
 export default router;

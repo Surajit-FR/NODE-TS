@@ -3,7 +3,7 @@
 import { Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import { findUserByCredential } from '../../helpers/findUserByCredential';
-import { ILoginCredentials, IUser } from '../../config/types';
+import { ILoginCredentials, IUser } from '../../../types/types';
 
 // Define the middleware function with proper typing
 export const HandleRegularLoginError = async (req: any, res: Response, next: NextFunction) => {
@@ -35,16 +35,7 @@ export const HandleRegularLoginError = async (req: any, res: Response, next: Nex
                 message: 'Incorrect password.',
                 key: 'password'
             });
-        }
-
-        // Check if account is deleted
-        if (user.is_delete === true) {
-            return res.status(403).json({
-                success: false,
-                message: 'Your account has been deleted. Please contact support for further assistance.',
-                key: 'user'
-            });
-        }
+        };
 
         // Attach user object to the request
         req.user = user;

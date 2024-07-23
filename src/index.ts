@@ -8,6 +8,11 @@ import http from 'http';
 import dotenv from 'dotenv';
 import { connectToDataBase } from './config/database.config';
 import authRoutes from '../src/routes/auth.routes';
+import paymentRoutes from '../src/routes/payment.routes';
+import subscriptionRoutes from '../src/routes/subscription.routes';
+import userRoutes from '../src/routes/user.routes';
+// Stripe Webhook
+import stripeWebhook from './routes/stripewebhook.routes';
 
 dotenv.config();
 
@@ -23,8 +28,19 @@ app.use(morgan('dev'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
+// Use the modular Webhook setup
+app.use('/stripe/webhook', stripeWebhook);
+
 // Use auth routes
-app.use('/api/auth', authRoutes);
+app.use('/api/v1/auth', authRoutes);
+
+/* USER */
+//  API routes
+app.use('/user/api/v1', [
+    paymentRoutes,
+    subscriptionRoutes,
+    userRoutes,
+]);
 
 // Socket.IO setup
 const server = http.createServer(app);
@@ -87,7 +103,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     });
 });
 
-const PORT = process.env.PORT || 4006;
+const PORT = process.env.PORT || 5000;
 const HOST = `${process.env.HOST}:${PORT}` || `http://localhost:${PORT}`;
 
 server.listen(PORT, () => {

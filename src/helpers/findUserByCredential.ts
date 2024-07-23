@@ -1,4 +1,4 @@
-import { IUser } from '../config/types';
+import { IUser } from '../../types/types';
 import UserModel from '../model/user.model';
 
 

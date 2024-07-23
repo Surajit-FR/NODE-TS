@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import UserModel from '../../model/user.model';
 import SecurePassword from '../../helpers/securePassword';
 import CreateToken from '../../helpers/createToken';
-import { IUser } from '../../config/types';
+import { IUser } from '../../../types/types';
 
 interface IRegisterRequestBody {
     name: string;
