@@ -26,7 +26,6 @@ export const getSubscriptionDetails = async (req: CustomRequest, res: Response):
     try {
         const decodedToken = req.decoded_token as DecodedToken;
         const customerId = decodedToken.subscription.customerId;
-
         // Retrieve subscriptions separately
         const subscriptions = await stripe.subscriptions.list({
             customer: customerId,
@@ -38,6 +37,7 @@ export const getSubscriptionDetails = async (req: CustomRequest, res: Response):
             return res.status(404).json({ message: 'No subscription found for this customer.' });
         }
 
+        // Retrieve plan details
         const priceId = subscription.items.data[0].price.id;
         const plan = await stripe.prices.retrieve(priceId);
 
