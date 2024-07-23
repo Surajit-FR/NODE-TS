@@ -15,7 +15,7 @@ export const createStripeSession = async (planID: string, userID: string): Promi
             ],
             mode: 'subscription',
             success_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/success/{CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/cancel`,
+            cancel_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/cancel/{CHECKOUT_SESSION_ID}`,
             metadata: {
                 userId: userID
             }
@@ -23,10 +23,12 @@ export const createStripeSession = async (planID: string, userID: string): Promi
 
         // Replace the placeholder with the actual session ID
         const successUrl = session.success_url?.replace('{CHECKOUT_SESSION_ID}', session.id || '');
+        const cancelUrl = session.cancel_url?.replace('{CHECKOUT_SESSION_ID}', session.id || '');
 
         return {
             id: session.id,
             success_url: successUrl,
+            cancel_url: cancelUrl,
         };
 
     } catch (error) {
