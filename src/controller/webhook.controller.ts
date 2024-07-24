@@ -8,7 +8,8 @@ import {
     handleInvoicePaid,
     handleInvoicePaymentFailed,
     handleSubscriptionUpdated,
-    handleCheckoutSessionAsyncPaymentFailed
+    handleCheckoutSessionAsyncPaymentFailed,
+    handleCustomerSubscriptionDeleted
 } from '../services/webhook.service';
 
 // handleStripeWebhook
@@ -46,6 +47,9 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
             break;
         case 'customer.subscription.updated':
             await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+            break;
+        case 'customer.subscription.deleted':
+            await handleCustomerSubscriptionDeleted(event.data.object);
             break;
         default:
             console.warn(`Unhandled event type: ${event.type}`);

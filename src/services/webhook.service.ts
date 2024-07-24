@@ -125,18 +125,39 @@ export const handleSubscriptionUpdated = async (subscriptionUpdated: Stripe.Subs
         let emailSubject = 'Subscription Updated';
         let emailMessage = 'Your subscription has been updated.';
 
+        SendEmail({
+            receiver: updatedEmail,
+            subject: emailSubject,
+            htmlContent: emailMessage
+        });
+
+        if (subscriptionStatus === 'active' && subscriptionUpdated.current_period_end) {
+            const subscriptionEndDate = new Date(subscriptionUpdated.current_period_end * 1000);
+            scheduleReminder(updatedEmail, subscriptionEndDate);
+        };
+    }
+};
+
+// Handler for customer.subscription.deleted
+export const handleCustomerSubscriptionDeleted = async (subscriptionCancel: Stripe.Subscription) => {
+    const updatedEmail = await fetchCustomerEmail(subscriptionCancel.customer as string);
+    if (updatedEmail) {
+        const subscriptionStatus = subscriptionCancel.status;
+        let emailSubject = 'Subscription Updated';
+        let emailMessage = 'Your subscription has been updated.';
+
         const subscriptionDataToUpdate: any = {
-            'subscription.planId': subscriptionUpdated.items.data[0].plan.id || "",
-            'subscription.planType': subscriptionUpdated.items.data[0].plan.interval || "",
-            'subscription.planStartDate': subscriptionUpdated.start_date ? new Date(subscriptionUpdated.start_date * 1000) : null,
-            'subscription.planEndDate': subscriptionUpdated.current_period_end ? new Date(subscriptionUpdated.current_period_end * 1000) : null,
-            'subscription.planDuration': subscriptionUpdated.start_date && subscriptionUpdated.current_period_end ?
-                calculateDurationInDays(new Date(subscriptionUpdated.start_date * 1000), new Date(subscriptionUpdated.current_period_end * 1000)).toString() :
+            'subscription.planId': subscriptionCancel.items.data[0].plan.id || "",
+            'subscription.planType': subscriptionCancel.items.data[0].plan.interval || "",
+            'subscription.planStartDate': subscriptionCancel.start_date ? new Date(subscriptionCancel.start_date * 1000) : null,
+            'subscription.planEndDate': subscriptionCancel.current_period_end ? new Date(subscriptionCancel.current_period_end * 1000) : null,
+            'subscription.planDuration': subscriptionCancel.start_date && subscriptionCancel.current_period_end ?
+                calculateDurationInDays(new Date(subscriptionCancel.start_date * 1000), new Date(subscriptionCancel.current_period_end * 1000)).toString() :
                 "",
             'is_subscribed': subscriptionStatus === 'active'
         };
 
-        if (subscriptionUpdated.cancellation_details?.reason === 'cancellation_requested') {
+        if (subscriptionCancel.cancellation_details?.reason === 'cancellation_requested') {
             subscriptionDataToUpdate['subscription.subscriptionId'] = "";
             subscriptionDataToUpdate['subscription.planId'] = "";
             subscriptionDataToUpdate['subscription.planType'] = "";
@@ -153,11 +174,6 @@ export const handleSubscriptionUpdated = async (subscriptionUpdated: Stripe.Subs
             subject: emailSubject,
             htmlContent: emailMessage
         });
-
-        if (subscriptionStatus === 'active' && subscriptionUpdated.current_period_end) {
-            const subscriptionEndDate = new Date(subscriptionUpdated.current_period_end * 1000);
-            scheduleReminder(updatedEmail, subscriptionEndDate);
-        }
 
         await UserModel.findOneAndUpdate(
             { email: updatedEmail },
