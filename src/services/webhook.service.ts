@@ -138,7 +138,8 @@ export const handleSubscriptionUpdated = async (subscriptionUpdated: Stripe.Subs
 
         if (subscriptionUpdated.cancellation_details?.reason === 'cancellation_requested') {
             subscriptionDataToUpdate['subscription.subscriptionId'] = "";
-            subscriptionDataToUpdate['subscription.customerId'] = "";
+            subscriptionDataToUpdate['subscription.planId'] = "";
+            subscriptionDataToUpdate['subscription.planType'] = "";
             subscriptionDataToUpdate['subscription.planStartDate'] = null;
             subscriptionDataToUpdate['subscription.planEndDate'] = null;
             subscriptionDataToUpdate['subscription.planDuration'] = "";

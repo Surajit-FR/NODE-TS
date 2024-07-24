@@ -1,17 +1,18 @@
 import nodemailer from 'nodemailer';
 import { SendEmailOptions, SendEmailResponse } from '../../types/types';
+import { APP_PASSWORD, EMAIL_HOST, EMAIL_ID, EMAIL_PORT } from '../config/gmailApp.config';
 
 export const SendEmail = async ({ receiver, subject, htmlContent }: SendEmailOptions): Promise<SendEmailResponse> => {
     try {
         // Initialize nodemailer
         const transporter = nodemailer.createTransport({
-            host: process.env.EMAIL_HOST,
-            port: Number(process.env.EMAIL_PORT),
+            host: EMAIL_HOST,
+            port: Number(EMAIL_PORT),
             secure: false,
             requireTLS: true,
             auth: {
-                user: process.env.EMAIL_ID,
-                pass: process.env.EMAIL_APP_PASSWORD
+                user: EMAIL_ID,
+                pass: APP_PASSWORD
             }
         });
 
@@ -27,8 +28,8 @@ export const SendEmail = async ({ receiver, subject, htmlContent }: SendEmailOpt
 
         console.log("Email sent:", info.messageId);
         return { success: true, message: "Email sent successfully!" };
-    } catch (exc) {
-        console.log("Error sending email:", (exc as Error).message);
+    } catch (exc: any) {
+        console.log("Error sending email:", exc.message);
         return { success: false, message: "Service unavailable: Error sending email!" };
     }
 };

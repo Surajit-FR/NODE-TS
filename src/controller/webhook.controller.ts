@@ -22,7 +22,7 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
     } catch (err) {
         console.error('Webhook Error:', (err as Error).message);
         return res.status(400).json({ success: false, message: 'Webhook Error' });
-    }
+    };
 
     // Handle the event based on its type
     switch (event.type) {

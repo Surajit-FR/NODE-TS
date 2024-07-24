@@ -68,9 +68,9 @@ export const cancelSubscription = async (req: CustomRequest, res: Response): Pro
         }
 
         // Cancel the subscription
-        const canceledSub = await stripe.subscriptions.cancel(subscriptionId);
+        const subscription = await stripe.subscriptions.cancel(subscriptionId);
 
-        if (!canceledSub || canceledSub.status !== 'canceled') {
+        if (!subscription || subscription.status !== 'canceled') {
             // If subscription was not canceled successfully
             return res.status(400).json({ success: false, message: 'Subscription is already canceled or cannot be canceled.' });
         }
@@ -81,6 +81,7 @@ export const cancelSubscription = async (req: CustomRequest, res: Response): Pro
             {
                 $set: {
                     is_subscribed: false,
+                    "subscription.subscriptionId": "",
                     "subscription.sessionId": "",
                     "subscription.planId": "",
                     "subscription.planType": "",
@@ -91,9 +92,15 @@ export const cancelSubscription = async (req: CustomRequest, res: Response): Pro
             },
             { new: true }
         );
+
+        if (!updatedUser) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        }
+
         const tokenData = CreateToken(updatedUser as IUser);
         return res.status(200).json({ success: true, message: 'Subscription canceled successfully.', data: updatedUser, token: tokenData });
     } catch (exc: any) {
-        return res.status(500).json({ success: false, message: exc.message });
+        console.error('Error canceling subscription:', exc.message);
+        return res.status(500).json({ success: false, message: 'An error occurred while canceling the subscription.' });
     }
 };

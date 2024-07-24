@@ -2,7 +2,7 @@ import stripe from "../config/stripeConfig";
 import { StripeSessionResponse } from "../../types/types";
 
 // createStripeSession function
-export const createStripeSession = async (planID: string, userID: string): Promise<StripeSessionResponse> => {
+export const createStripeSession = async (planID: string, userID: string, customerID: string): Promise<StripeSessionResponse> => {
     try {
         // Create a new Stripe session
         const session = await stripe.checkout.sessions.create({
@@ -16,6 +16,7 @@ export const createStripeSession = async (planID: string, userID: string): Promi
             mode: 'subscription',
             success_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/success/{CHECKOUT_SESSION_ID}`,
             cancel_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/cancel/{CHECKOUT_SESSION_ID}`,
+            customer: customerID,
             metadata: {
                 userId: userID
             }
