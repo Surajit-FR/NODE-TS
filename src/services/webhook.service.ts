@@ -30,21 +30,48 @@ const calculateDurationInDays = (startDate: Date, endDate: Date): number => {
 export const handleCheckoutSessionCompleted = async (checkoutSession: Stripe.Checkout.Session) => {
     const userEmail = await fetchCustomerEmail(checkoutSession.customer as string);
     if (userEmail) {
+        SendEmail({
+            receiver: userEmail,
+            subject: 'Subscription Created',
+            htmlContent: 'Your subscription has been successfully created.'
+        });
+    }
+};
+
+// Handler for async_payment_failed
+export const handleCheckoutSessionAsyncPaymentFailed = async (checkoutSession: Stripe.Checkout.Session) => {
+    const userEmail = await fetchCustomerEmail(checkoutSession.customer as string);
+    if (userEmail) {
         const user = await UserModel.findOne({ "subscription.sessionId": checkoutSession.id });
         if (user) {
-            const existingSubscriptionId = user.subscription.subscriptionId;
-            if (existingSubscriptionId) {
-                const existingSubscription = await stripe.subscriptions.retrieve(existingSubscriptionId);
-                if (existingSubscription && existingSubscription.status === 'active') {
-                    await stripe.subscriptions.update(existingSubscriptionId, {
-                        cancel_at_period_end: true,
-                    });
-                }
+            const subscriptionId = user.subscription.subscriptionId;
+            if (subscriptionId) {
+                await stripe.subscriptions.update(subscriptionId, {
+                    items: [{
+                        id: user.subscription.subscriptionId,
+                        price: user.subscription.previous_price,
+                    }],
+                    proration_behavior: 'none',
+                });
+
+                await UserModel.findOneAndUpdate(
+                    { "subscription.sessionId": checkoutSession.id },
+                    {
+                        $set: {
+                            "subscription.planId": user.subscription.previous_plan_id,
+                            "subscription.planType": user.subscription.previous_plan_type,
+                            "subscription.planStartDate": null,
+                            "subscription.planEndDate": null,
+                            "subscription.planDuration": "",
+                            "is_subscribed": false
+                        }
+                    }
+                );
             }
             SendEmail({
                 receiver: userEmail,
-                subject: 'Subscription Created',
-                htmlContent: 'Your subscription has been successfully created.'
+                subject: 'Payment Failed',
+                htmlContent: 'Your subscription payment failed. Please try again.'
             });
         }
     }
@@ -98,14 +125,7 @@ export const handleSubscriptionUpdated = async (subscriptionUpdated: Stripe.Subs
         let emailSubject = 'Subscription Updated';
         let emailMessage = 'Your subscription has been updated.';
 
-        const subscriptionDataToUpdate: {
-            'subscription.planId': string;
-            'subscription.planType': string;
-            'subscription.planStartDate': Date | null;
-            'subscription.planEndDate': Date | null;
-            'subscription.planDuration': string;
-            'is_subscribed': boolean;
-        } = {
+        const subscriptionDataToUpdate: any = {
             'subscription.planId': subscriptionUpdated.items.data[0].plan.id || "",
             'subscription.planType': subscriptionUpdated.items.data[0].plan.interval || "",
             'subscription.planStartDate': subscriptionUpdated.start_date ? new Date(subscriptionUpdated.start_date * 1000) : null,
@@ -117,6 +137,8 @@ export const handleSubscriptionUpdated = async (subscriptionUpdated: Stripe.Subs
         };
 
         if (subscriptionUpdated.cancellation_details?.reason === 'cancellation_requested') {
+            subscriptionDataToUpdate['subscription.subscriptionId'] = "";
+            subscriptionDataToUpdate['subscription.customerId'] = "";
             subscriptionDataToUpdate['subscription.planStartDate'] = null;
             subscriptionDataToUpdate['subscription.planEndDate'] = null;
             subscriptionDataToUpdate['subscription.planDuration'] = "";

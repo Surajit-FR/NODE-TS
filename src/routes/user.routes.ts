@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import Limiter from '../helpers/request_limiter';
+import Limiter from '../helpers/requestLimiter';
 import { VerifyToken } from '../middleware/auth/authUser';
 import { cancelSubscription, getSubscriptionDetails, getUserDetails } from '../controller/user.controller';
 

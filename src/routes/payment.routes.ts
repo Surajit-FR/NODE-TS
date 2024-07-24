@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import Limiter from '../helpers/request_limiter';
+import Limiter from '../helpers/requestLimiter';
 import { BillingPortal, CreateCheckoutSession, PaymentSuccess, UpdateSubscription } from '../controller/payment.controller';
 import { VerifyToken } from '../middleware/auth/authUser';
 

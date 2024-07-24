@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import Limiter from '../helpers/request_limiter';
+import Limiter from '../helpers/requestLimiter';
 import ModelAuth from '../middleware/auth/modelAuth';
 import { validateSubscriptionPlan } from '../model/validator/subscriptionPlanSchema.validate';
 import { VerifyToken } from '../middleware/auth/authUser';

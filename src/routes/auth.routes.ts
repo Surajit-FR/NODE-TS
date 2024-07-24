@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import Limiter from '../helpers/request_limiter';
+import Limiter from '../helpers/requestLimiter';
 import ModelAuth from '../middleware/auth/modelAuth';
 import ValidateUser from '../model/validator/userSchema.validate';
 import { HandleRegularLoginError } from '../middleware/auth/credsValidation';

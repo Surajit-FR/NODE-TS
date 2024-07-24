@@ -8,6 +8,7 @@ const rateLimitOptions = {
     message: "Too many requests. Please try again after sometime :(",
     legacyHeaders: false, // Disable the X-RateLimit-* headers
     standardHeaders: true, // Enable the RateLimit-* headers
+    trustProxy: true,
     keyGenerator: function (request: Request): string {
         // Ensure request.ip is a string or provide a default value
         return request.ip || 'default-key';

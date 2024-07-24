@@ -7,7 +7,8 @@ import {
     handlePaymentIntentFailed,
     handleInvoicePaid,
     handleInvoicePaymentFailed,
-    handleSubscriptionUpdated
+    handleSubscriptionUpdated,
+    handleCheckoutSessionAsyncPaymentFailed
 } from '../services/webhook.service';
 
 // handleStripeWebhook
@@ -27,6 +28,9 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
     switch (event.type) {
         case 'checkout.session.completed':
             await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
+            break;
+        case 'checkout.session.async_payment_failed':
+            await handleCheckoutSessionAsyncPaymentFailed(event.data.object as Stripe.Checkout.Session);
             break;
         case 'payment_intent.succeeded':
             await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);

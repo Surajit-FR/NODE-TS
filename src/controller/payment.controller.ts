@@ -6,24 +6,23 @@ import stripe from '../config/stripeConfig';
 import SubscriptionPlanModel from '../model/subscriptionPlan.model';
 import CreateToken from '../helpers/createToken';
 import { createStripeSession } from '../services/stripe.service';
+import Stripe from 'stripe';
 
 
 // CreateCheckoutSession
 export const CreateCheckoutSession = async (req: CustomRequest, res: Response): Promise<Response> => {
-    const { product }: { product: Product } = req.body;
+    const { product } = req.body as { product: Product };
 
     try {
-        const decodedToken = req.decoded_token as DecodedToken;
-        if (!decodedToken) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
-        }
-        const userID = decodedToken._id;
-        let customerID = decodedToken.subscription?.customerId;
+        const decoded_token = req.decoded_token as DecodedToken;
+        const userID = decoded_token._id;
+        const planID = product.stripe_price_id;
+        let customerID = decoded_token.subscription.customerId;
 
         // Check the existing user
-        const existingUser = await UserModel.findById(userID).exec();
+        const existingUser: IUser | null = await UserModel.findById(userID);
         if (!existingUser) {
-            return res.status(404).json({ success: false, message: "User not found!" });
+            return res.status(404).json({ success: false, message: 'User not found!' });
         }
 
         // Create a new Stripe customer if customerId is not present
@@ -34,25 +33,25 @@ export const CreateCheckoutSession = async (req: CustomRequest, res: Response): 
                 metadata: { userId: userID }
             });
             customerID = customer.id;
-
-            // Update user record with the new customerId
-            await UserModel.findByIdAndUpdate(userID, {
-                'subscription.customerId': customerID
-            }, { new: true }).exec();
         }
 
         // Now create the Stripe checkout session
-        const session = await createStripeSession(product.stripe_price_id, userID);
+        const session = await createStripeSession(planID, userID);
 
         if (session.error) {
             return res.status(409).json({ success: false, message: session.error });
         }
 
         // Update the user with sessionID
-        await UserModel.findByIdAndUpdate(userID, {
-            'subscription.sessionId': session.id,
-            'subscription.subscriptionId': session.subscription,
-        }, { new: true }).exec();
+        await UserModel.findByIdAndUpdate(
+            { _id: userID },
+            {
+                subscription: {
+                    sessionId: session.id,
+                }
+            },
+            { new: true }
+        );
 
         return res.status(201).json({ id: session.id });
     } catch (exc: any) {
@@ -64,32 +63,24 @@ export const CreateCheckoutSession = async (req: CustomRequest, res: Response): 
 // PaymentSuccess
 export const PaymentSuccess = async (req: CustomRequest, res: Response): Promise<Response> => {
     try {
-        const decodedToken = req.decoded_token as DecodedToken;
-        const userID = decodedToken._id;
-        const sessionID: string = req.body._sessionID;
+        const decoded_token = req.decoded_token as DecodedToken;
+        const userID = decoded_token._id;
+        const sessionID = req.body.sessionID;
 
-        // Retrieve the Stripe session
         const session = await stripe.checkout.sessions.retrieve(sessionID);
 
+        const subscriptionId = session.subscription as string;
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        const planId = subscription.items.data[0].price.id;
+
+        // Check the existing user
+        const existingUser: IUser | null = await UserModel.findById(userID);
+        if (!existingUser) {
+            return res.status(404).json({ success: false, message: "User not found!" });
+        }
+
         if (session.payment_status === "paid") {
-            // Ensure subscriptionId is a string
-            const subscriptionId = session.subscription as string;
-
-            if (!subscriptionId) {
-                return res.status(400).json({ success: false, message: "Subscription ID is missing!" });
-            }
-
-            // Retrieve the Stripe subscription
-            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-
-            // Check the existing user
-            const existingUser = await UserModel.findById(userID).exec();
-            if (!existingUser) {
-                return res.status(404).json({ success: false, message: "User not found!" });
-            }
-
-            const planId = subscription.items.data[0].price.id;
-            const subscriptionPlan = await SubscriptionPlanModel.findOne({ stripe_price_id: planId }).exec();
+            const subscriptionPlan = await SubscriptionPlanModel.findOne({ stripe_price_id: planId });
 
             if (!subscriptionPlan) {
                 return res.status(404).json({ success: false, message: "Subscription plan not found!" });
@@ -99,30 +90,66 @@ export const PaymentSuccess = async (req: CustomRequest, res: Response): Promise
             const planType = subscriptionPlan.type;
             const startDate = moment.unix(subscription.current_period_start).format('YYYY-MM-DD');
             const endDate = moment.unix(subscription.current_period_end).format('YYYY-MM-DD');
-            const durationInSeconds = (subscription.current_period_end - subscription.current_period_start);
+            const durationInSeconds = subscription.current_period_end - subscription.current_period_start;
             const durationInDays = moment.duration(durationInSeconds, 'seconds').asDays();
 
             // Update the user with subscription data
-            const userData = await UserModel.findByIdAndUpdate(userID, {
-                'subscription.subscriptionId': subscription.id,
-                'subscription.customerId': customerId,
-                'subscription.sessionId': "",
-                'subscription.planId': planId,
-                'subscription.planType': planType,
-                'subscription.planStartDate': startDate,
-                'subscription.planEndDate': endDate,
-                'subscription.planDuration': durationInDays,
-                is_subscribed: true,
-            }, { new: true }).exec();
+            const USER_DATA = await UserModel.findByIdAndUpdate(
+                userID,
+                {
+                    subscription: {
+                        subscriptionId: subscription.id,
+                        customerId: customerId,
+                        sessionId: "",
+                        planId: planId,
+                        planType: planType,
+                        planStartDate: startDate,
+                        planEndDate: endDate,
+                        planDuration: durationInDays,
+                    },
+                    is_subscribed: true,
+                },
+                { new: true }
+            );
 
-            if (!userData) {
-                return res.status(404).json({ success: false, message: "Failed to update user data!" });
+            if (!USER_DATA) {
+                return res.status(500).json({ success: false, message: "Failed to update user subscription data" });
             }
 
-            const tokenData = CreateToken(userData as IUser);
-            return res.status(201).json({ success: true, message: "Payment Successful!", data: userData, token: tokenData });
+            const tokenData = CreateToken(USER_DATA as IUser);
+            return res.status(201).json({ success: true, message: "Payment Successful!", data: USER_DATA, token: tokenData });
+        } else if (session.payment_status === "unpaid") {
+            const currentItemId = subscription.items.data[0].id;
+
+            await stripe.subscriptions.update(subscriptionId, {
+                items: [{
+                    id: currentItemId,
+                    price: planId,
+                }],
+                proration_behavior: 'none',
+            });
+
+            await UserModel.findByIdAndUpdate(
+                userID,
+                {
+                    $set: {
+                        "subscription.subscriptionId": existingUser.subscription.subscriptionId,
+                        "subscription.customerId": existingUser.subscription.customerId,
+                        "subscription.sessionId": existingUser.subscription.sessionId,
+                        "subscription.planId": existingUser.subscription.planId,
+                        "subscription.planType": existingUser.subscription.planType,
+                        "subscription.planStartDate": existingUser.subscription.planStartDate,
+                        "subscription.planEndDate": existingUser.subscription.planEndDate,
+                        "subscription.planDuration": existingUser.subscription.planDuration,
+                        "is_subscribed": existingUser.is_subscribed,
+                    }
+                }
+            );
+
+            return res.status(200).json({ success: true, message: "Subscription updated for unpaid session" });
+        } else {
+            return res.status(400).json({ success: false, message: "Invalid payment status" });
         }
-        return res.status(400).json({ success: false, message: "Payment not successful!" });
     } catch (exc: any) {
         console.log(exc.message);
         return res.status(500).json({ success: false, message: exc.message, error: "Internal Server Error" });
@@ -153,28 +180,23 @@ export const BillingPortal = async (req: CustomRequest, res: Response): Promise<
 
 // UpdateSubscription
 export const UpdateSubscription = async (req: CustomRequest, res: Response): Promise<Response> => {
-    const { product }: { product: Product } = req.body;
+    const { product } = req.body as { product: Product };
     const newPlanID = product.stripe_price_id;
 
     try {
         const decodedToken = req.decoded_token as DecodedToken;
         const userID = decodedToken._id;
 
-        // Check the existing user
-        const existingUser = await UserModel.findById(userID).exec();
+        const existingUser: IUser | null = await UserModel.findOne({ _id: userID });
         if (!existingUser || !existingUser.subscription || !existingUser.subscription.subscriptionId) {
             return res.status(404).json({ success: false, message: "User or subscription not found!" });
         }
 
         const subscriptionID = existingUser.subscription.subscriptionId;
-
-        // Retrieve the current subscription
         const subscription = await stripe.subscriptions.retrieve(subscriptionID);
 
-        // Calculate proration for the upgrade
+        // Calculate the prorated amount
         const prorationDate = Math.min(moment().unix(), subscription.current_period_end);
-
-        // Update the subscription with proration
         const updatedSubscription = await stripe.subscriptions.update(subscriptionID, {
             items: [{
                 id: subscription.items.data[0].id,
@@ -185,28 +207,52 @@ export const UpdateSubscription = async (req: CustomRequest, res: Response): Pro
             expand: ['latest_invoice.payment_intent'],
         });
 
-        // Now create the Stripe checkout session
-        const session = await createStripeSession(newPlanID, userID);
+        const latestInvoice = updatedSubscription.latest_invoice as Stripe.Invoice;
+        const paymentIntent = latestInvoice.payment_intent as Stripe.PaymentIntent;
+        const paymentIntentStatus = paymentIntent.status;
 
-        if (session.error) {
-            await stripe.subscriptions.update(subscriptionID, {
-                items: [{
-                    id: updatedSubscription.items.data[0].id,
-                    price: subscription.items.data[0].price.id,
-                }],
-                proration_behavior: 'none',
-            });
-            return res.status(409).json({ success: false, message: session.error });
+        if (paymentIntentStatus === 'succeeded') {
+            // Update user subscription in database
+            const subscriptionPlan = await SubscriptionPlanModel.findOne({ stripe_price_id: newPlanID });
+            if (!subscriptionPlan) {
+                return res.status(404).json({ success: false, message: "Subscription plan not found!" });
+            }
+
+            const planType = subscriptionPlan.type;
+            const startDate = moment.unix(updatedSubscription.current_period_start).format('YYYY-MM-DD');
+            const endDate = moment.unix(updatedSubscription.current_period_end).format('YYYY-MM-DD');
+            const durationInSeconds = updatedSubscription.current_period_end - updatedSubscription.current_period_start;
+            const durationInDays = moment.duration(durationInSeconds, 'seconds').asDays();
+
+            const updatedUser: IUser | null = await UserModel.findByIdAndUpdate(
+                userID,
+                {
+                    subscription: {
+                        subscriptionId: updatedSubscription.id,
+                        customerId: updatedSubscription.customer as string,
+                        sessionId: paymentIntent.id,
+                        planId: newPlanID,
+                        planType: planType,
+                        planStartDate: startDate,
+                        planEndDate: endDate,
+                        planDuration: durationInDays,
+                    },
+                    is_subscribed: true,
+                },
+                { new: true }
+            );
+
+            if (!updatedUser) {
+                return res.status(500).json({ success: false, message: "Failed to update user." });
+            }
+
+            const tokenData = CreateToken(updatedUser);
+            return res.status(200).json({ success: true, message: "Your subscription has been updated!", data: updatedUser, token: tokenData });
+        } else {
+            return res.status(400).json({ success: false, message: 'Payment status is not succeeded.' });
         }
-
-        await UserModel.findByIdAndUpdate(userID, {
-            'subscription.sessionId': session.id,
-            'subscription.subscriptionId': updatedSubscription.id,
-        }, { new: true }).exec();
-
-        return res.status(200).json({ success: true, sessionId: session.id });
     } catch (exc: any) {
-        console.log(exc.message);
-        return res.status(500).json({ success: false, message: exc.message, error: "Internal Server Error" });
+        console.error(exc.message);
+        return res.status(500).json({ success: false, message: exc.message });
     }
 };

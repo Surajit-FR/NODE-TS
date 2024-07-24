@@ -5,6 +5,9 @@ export interface Config {
     secret_key: string | undefined;
 };
 export interface ISubscription {
+    previous_price: string | undefined;
+    previous_plan_id: any;
+    previous_plan_type: any;
     subscriptionId: string;
     customerId: string;
     sessionId: string;
@@ -64,7 +67,22 @@ export interface DecodedToken {
     };
 };
 export interface Product {
+    _id: string;
+    name: string;
     stripe_price_id: string;
+    trial_days: number;
+    is_trial: boolean;
+    amount: number;
+    type: string;
+    user_count: number;
+    chat_inference: string;
+    image_generation: number;
+    youtube_video_summarization: string;
+    financial_data_insight_for_stocks: boolean;
+    news_aggregator_per_day: number;
+    createdAt: string;
+    updatedAt: string;
+    __v: number;
 };
 export interface StripeSessionResponse {
     [x: string]: any;
