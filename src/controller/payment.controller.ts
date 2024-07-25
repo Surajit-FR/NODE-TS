@@ -179,7 +179,7 @@ export const BillingPortal = async (req: CustomRequest, res: Response): Promise<
 
         const portalSession = await stripe.billingPortal.sessions.create({
             customer: customerId,
-            return_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/profile`
+            return_url: `${process.env.FRONTEND_HOST}/profile`
         });
 
         return res.status(201).json({ success: true, message: "New billing portal session created!", data: portalSession });
