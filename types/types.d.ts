@@ -18,6 +18,7 @@ export interface ISubscription {
     planDuration: string;
 };
 export interface IUser extends Document {
+    _id: ObjectId;
     name: string;
     email: string;
     password: string;
@@ -25,6 +26,13 @@ export interface IUser extends Document {
     is_subscribed: boolean;
     createdAt?: Date;
     updatedAt?: Date;
+};
+export interface IRefund extends Document {
+    user: ObjectId;
+    refundId: string;
+    amount: number;
+    status: string;
+    created: Date | null;
 };
 export interface ICheckUserBody {
     email: string;

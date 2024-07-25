@@ -31,7 +31,9 @@ export const CreateCheckoutSession = async (req: CustomRequest, res: Response): 
             const customer = await stripe.customers.create({
                 email: existingUser.email,
                 name: existingUser.name,
-                metadata: { userId: userID }
+                metadata: {
+                    userId: existingUser._id.toString(),
+                }
             });
             customerID = customer.id;
 
@@ -214,6 +216,11 @@ export const UpdateSubscription = async (req: CustomRequest, res: Response): Pro
             proration_behavior: 'create_prorations',
             proration_date: prorationDate,
             expand: ['latest_invoice.payment_intent'],
+            metadata: {
+                userId: existingUser._id.toString(),
+                userName: existingUser.name,
+                userEmail: existingUser.email,
+            }
         });
 
         const latestInvoice = updatedSubscription.latest_invoice as Stripe.Invoice;

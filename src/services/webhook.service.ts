@@ -4,6 +4,8 @@ import { SendEmail } from '../helpers/sendEmail';
 import stripe from '../config/stripeConfig';
 import { scheduleReminder } from '../services/notification.service';
 import moment from 'moment';
+import RefundModel from '../model/refund.model';
+import { findUserById } from '../helpers/findUserByCredential';
 
 // Helper function to fetch customer email
 const fetchCustomerEmail = async (customerId: string): Promise<string | null> => {
@@ -28,7 +30,8 @@ const calculateDurationInDays = (startDate: Date, endDate: Date): number => {
 
 // Handler for checkout.session.completed
 export const handleCheckoutSessionCompleted = async (checkoutSession: Stripe.Checkout.Session) => {
-    const userEmail = await fetchCustomerEmail(checkoutSession.customer as string);
+    const user = await findUserById(checkoutSession.metadata?.userId as string);
+    const userEmail = user?.email;
     if (userEmail) {
         SendEmail({
             receiver: userEmail,
@@ -40,7 +43,17 @@ export const handleCheckoutSessionCompleted = async (checkoutSession: Stripe.Che
 
 // Handler for async_payment_failed
 export const handleCheckoutSessionAsyncPaymentFailed = async (checkoutSession: Stripe.Checkout.Session) => {
-    const userEmail = await fetchCustomerEmail(checkoutSession.customer as string);
+    const customerId = checkoutSession.customer as string;
+
+    // Fetch userId using customerId from your database (assuming customerId is stored in your UserModel)
+    const user = await UserModel.findOne({ 'subscription.customerId': customerId });
+
+    if (!user) {
+        console.error('User not found for customerId:', customerId);
+        return;
+    };
+    const userEmail = user.email;
+
     if (userEmail) {
         const user = await UserModel.findOne({ "subscription.sessionId": checkoutSession.id });
         if (user) {
@@ -119,7 +132,17 @@ export const handleInvoicePaymentFailed = async (failedInvoice: Stripe.Invoice) 
 
 // Handler for customer.subscription.updated
 export const handleSubscriptionUpdated = async (subscriptionUpdated: Stripe.Subscription) => {
-    const updatedEmail = await fetchCustomerEmail(subscriptionUpdated.customer as string);
+    const customerId = subscriptionUpdated.customer as string;
+
+    // Fetch userId using customerId from your database (assuming customerId is stored in your UserModel)
+    const user = await UserModel.findOne({ 'subscription.customerId': customerId });
+
+    if (!user) {
+        console.error('User not found for customerId:', customerId);
+        return;
+    };
+    const updatedEmail = user.email;
+
     if (updatedEmail) {
         const subscriptionStatus = subscriptionUpdated.status;
         let emailSubject = 'Subscription Updated';
@@ -140,8 +163,20 @@ export const handleSubscriptionUpdated = async (subscriptionUpdated: Stripe.Subs
 
 // Handler for customer.subscription.deleted
 export const handleCustomerSubscriptionDeleted = async (subscriptionCancel: Stripe.Subscription) => {
-    const updatedEmail = await fetchCustomerEmail(subscriptionCancel.customer as string);
-    if (updatedEmail) {
+    try {
+        const customerId = subscriptionCancel.customer as string;
+
+        // Fetch userId using customerId from your database (assuming customerId is stored in your UserModel)
+        const user = await UserModel.findOne({ 'subscription.customerId': customerId });
+
+        if (!user) {
+            console.error('User not found for customerId:', customerId);
+            return;
+        }
+
+        const userId = user._id;
+        const updatedEmail = user.email;
+
         const subscriptionStatus = subscriptionCancel.status;
         let emailSubject = 'Subscription Updated';
         let emailMessage = 'Your subscription has been updated.';
@@ -158,7 +193,6 @@ export const handleCustomerSubscriptionDeleted = async (subscriptionCancel: Stri
         };
 
         if (subscriptionCancel.cancellation_details?.reason === 'cancellation_requested') {
-            subscriptionDataToUpdate['subscription.subscriptionId'] = "";
             subscriptionDataToUpdate['subscription.planId'] = "";
             subscriptionDataToUpdate['subscription.planType'] = "";
             subscriptionDataToUpdate['subscription.planStartDate'] = null;
@@ -169,15 +203,45 @@ export const handleCustomerSubscriptionDeleted = async (subscriptionCancel: Stri
             emailMessage = 'Your subscription has been canceled.';
         }
 
+        // Update user data using userId
+        await UserModel.findByIdAndUpdate(
+            userId,
+            { $set: subscriptionDataToUpdate },
+            { new: true }
+        );
+
+        // Send email to the user
         SendEmail({
             receiver: updatedEmail,
             subject: emailSubject,
             htmlContent: emailMessage
         });
 
-        await UserModel.findOneAndUpdate(
-            { email: updatedEmail },
-            subscriptionDataToUpdate
-        );
+    } catch (error: any) {
+        console.error('Error handling subscription cancellation:', error.message);
+        return error.message;
     }
+};
+
+// Handle Refund Updated
+export const handleRefundUpdated = async (refund: Stripe.Refund) => {
+    const user = await findUserById(refund.metadata?.userId as string);
+    const userEmail = user?.email;
+    if (userEmail) {
+        SendEmail({
+            receiver: userEmail,
+            subject: 'Refund Updated',
+            htmlContent: `Your refund has been updated. Refund ID: ${refund.id}`
+        });
+    }
+
+    // Save the refund information to the database
+    const refundDocument = new RefundModel({
+        user: refund.metadata?.userId,
+        refundId: refund.id,
+        amount: refund.amount,
+        status: refund.status,
+        created: new Date(refund.created * 1000),
+    });
+    await refundDocument.save();
 };

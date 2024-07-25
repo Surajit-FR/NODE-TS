@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import Limiter from '../helpers/requestLimiter';
 import { VerifyToken } from '../middleware/auth/authUser';
-import { cancelSubscription, getSubscriptionDetails, getUserDetails } from '../controller/user.controller';
+import { cancelSubscription, getSubscriptionDetails, getUserDetails, requestRefund } from '../controller/user.controller';
 
 const router: Router = express.Router();
 
@@ -11,6 +11,8 @@ router.get('/get-user-details', [VerifyToken], getUserDetails);
 router.get('/get-subscription-details', [VerifyToken], getSubscriptionDetails);
 // CancelSubscription
 router.post('/cancel-subscription', [Limiter, VerifyToken], cancelSubscription);
+// RequestRefund
+router.post('/request-refund', [Limiter, VerifyToken], requestRefund);
 
 
 export default router;

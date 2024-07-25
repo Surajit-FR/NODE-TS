@@ -17,3 +17,10 @@ export const findUserByCredential = async (credential: string): Promise<IUser | 
 
     return user;
 };
+
+// Define the findUserById function
+export const findUserById = async (userId: string): Promise<IUser | null> => {
+    let user: IUser | null = null;
+    user = await UserModel.findOne({ _id: userId }).exec();
+    return user;
+};

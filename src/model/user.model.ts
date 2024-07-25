@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
+import mongoose, { Schema, Model } from 'mongoose';
 import { IUser } from '../../types/types';
 
 const SubscriptionSchema: Schema = new Schema({
@@ -20,6 +20,6 @@ const UserSchema: Schema<IUser> = new Schema({
     is_subscribed: { type: Boolean, default: false },
 }, { timestamps: true });
 
-const UserModel: Model<IUser> = mongoose.model<IUser>('User', UserSchema);
+const UserModel: Model<IUser> = mongoose.model<IUser>('user', UserSchema);
 
 export default UserModel;
